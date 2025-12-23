@@ -20,8 +20,8 @@ from analysis_utils import (
 
 def main():
     print("1. Loading Data...")
-    df_panels = pl.read_parquet("panels.parquet")
-    df_defects = pl.read_parquet("defects.parquet")
+    df_panels = pl.read_parquet("data/panels.parquet")
+    df_defects = pl.read_parquet("data/defects.parquet")
     
     print(f"   Panels: {len(df_panels)}")
     print(f"   Defects: {len(df_defects)}")
@@ -280,12 +280,12 @@ def main():
     plt.colorbar(cm.ScalarMappable(norm=norm_clean, cmap=cmap), ax=ax2, label="Cleaned Defect Count")
 
     plt.tight_layout()
-    plt.savefig("final_result.png")
-    print("Saved final_result.png")
+    plt.savefig("results/final_result.png")
+    print("Saved results/final_result.png")
     
     # 7. Generate Report
     print("7. Generating Report...")
-    with open("final_report.md", "w") as f:
+    with open("results/final_report.md", "w") as f:
         f.write("# Grid Map Analysis Final Report\n\n")
         f.write("## Overview\n")
         f.write("This report summarizes the analysis of defect patterns on the panel grid. ")
@@ -311,7 +311,7 @@ def main():
         else:
             f.write("| None | - | - | - | - |\n")
             
-    print("Saved final_report.md")
+    print("Saved results/final_report.md")
 
 if __name__ == "__main__":
     main()

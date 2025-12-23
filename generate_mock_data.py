@@ -66,7 +66,7 @@ def generate_data(base_dir=".", n_defects=1000, n_outliers=50):
                 })
             
     df_panels = pl.DataFrame(panel_rows)
-    df_panels.write_parquet(os.path.join(base_dir, "panels.parquet"))
+    df_panels.write_parquet("data/panels.parquet")
     print(f"Generated panels.parquet with {len(df_panels)} rows (40 panels).")
 
     # 2. Generate Defects (Clustered)
@@ -141,7 +141,7 @@ def generate_data(base_dir=".", n_defects=1000, n_outliers=50):
         })
 
     df_defects = pl.DataFrame(defects)
-    df_defects.write_parquet(os.path.join(base_dir, "defects.parquet"))
+    df_defects.write_parquet("data/defects.parquet")
     print(f"Generated defects.parquet with {len(df_defects)} rows.")
 
 if __name__ == "__main__":

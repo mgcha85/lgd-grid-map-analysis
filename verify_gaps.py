@@ -10,8 +10,8 @@ def verify_process():
     generate_data(n_outliers=n_outliers)
     
     # 2. Load data
-    df_panels = pl.read_parquet("panels.parquet")
-    df_defects = pl.read_parquet("defects.parquet")
+    df_panels = pl.read_parquet("data/panels.parquet")
+    df_defects = pl.read_parquet("data/defects.parquet")
     
     print(f"Initial Defect Count: {len(df_defects)}")
 

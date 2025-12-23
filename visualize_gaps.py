@@ -9,8 +9,8 @@ from grid_mapping import generate_grid_cells, GridCell
 def visualize_process():
     # 1. Generate & Load Data
     generate_data(n_outliers=10)
-    df_panels = pl.read_parquet("panels.parquet")
-    df_defects_raw = pl.read_parquet("defects.parquet")
+    df_panels = pl.read_parquet("data/panels.parquet")
+    df_defects_raw = pl.read_parquet("data/defects.parquet")
     
     # 2. Process Data
     # Filter
@@ -149,7 +149,7 @@ def visualize_process():
     ax.legend()
 
     plt.tight_layout()
-    output_file = "gap_analysis_visualization.png"
+    output_file = "results/gap_analysis_visualization.png"
     plt.savefig(output_file, dpi=150)
     print(f"Visualization saved to {output_file}")
 

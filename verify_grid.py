@@ -6,7 +6,7 @@ from grid_mapping import generate_grid_cells, GridCell
 def verify_grid_mapping():
     # 1. Setup Data
     generate_data() # standard mock data
-    df_panels = pl.read_parquet("panels.parquet")
+    df_panels = pl.read_parquet("data/panels.parquet")
     
     # 2. Gap analysis
     shift_x, shift_y = find_gaps(df_panels)

@@ -48,8 +48,8 @@ import polars as pl
 from gap_analysis import find_gaps, remove_gaps, filter_valid_points
 
 # 데이터 로드
-df_panels = pl.read_parquet("panels.parquet")
-df_defects = pl.read_parquet("defects.parquet")
+df_panels = pl.read_parquet("data/panels.parquet")
+df_defects = pl.read_parquet("data/defects.parquet")
 
 # 1. 이상치 제거 (패널 밖 데이터 삭제)
 df_valid_defects = filter_valid_points(df_defects, df_panels)
