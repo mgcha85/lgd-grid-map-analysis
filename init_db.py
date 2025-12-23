@@ -56,7 +56,11 @@ def seed_data():
     defaults = {
         "grid_split_x": "3",
         "grid_split_y": "3",
-        "defect_threshold": "2"
+        "defect_threshold": "2",
+        "map_min_x": "-900",
+        "map_max_x": "900",
+        "map_min_y": "-700",
+        "map_max_y": "700"
     }
     
     for key, val in defaults.items():

@@ -79,7 +79,17 @@ def main():
     # Load Config from DB
     config_split_x = int(db.query(AnalysisConfig).filter(AnalysisConfig.key == "grid_split_x").first().value)
     config_split_y = int(db.query(AnalysisConfig).filter(AnalysisConfig.key == "grid_split_y").first().value)
-    print(f"   Config: Grid Split {config_split_x}x{config_split_y}")
+    
+    # Load Map Limits
+    try:
+        map_min_x = float(db.query(AnalysisConfig).filter(AnalysisConfig.key == "map_min_x").first().value)
+        map_max_x = float(db.query(AnalysisConfig).filter(AnalysisConfig.key == "map_max_x").first().value)
+        map_min_y = float(db.query(AnalysisConfig).filter(AnalysisConfig.key == "map_min_y").first().value)
+        map_max_y = float(db.query(AnalysisConfig).filter(AnalysisConfig.key == "map_max_y").first().value)
+    except:
+        map_min_x, map_max_x, map_min_y, map_max_y = -900, 900, -700, 700
+        
+    print(f"   Config: Grid Split {config_split_x}x{config_split_y}, Map Limits: X({map_min_x}~{map_max_x}), Y({map_min_y}~{map_max_y})")
     
     # 2. Filter Outliers
     print("2. Filtering Outliers...")
@@ -201,8 +211,8 @@ def main():
         label = get_panel_label(row["seq"])
         ax1.text(min_x + 10, max_y - 20, label, fontsize=12, fontweight='bold', color='black')
 
-    ax1.set_xlim(-900, 900)
-    ax1.set_ylim(-700, 700)
+    ax1.set_xlim(map_min_x, map_max_x)
+    ax1.set_ylim(map_min_y, map_max_y)
     plt.colorbar(cm.ScalarMappable(norm=norm_raw, cmap=cmap), ax=ax1, label="Raw Defect Count")
 
     # --- Plot 2: Cleaned Map ---
@@ -293,7 +303,7 @@ def main():
         all_min_y = min(b["min_y"] for b in panel_clean_bounds.values())
         all_max_y = max(b["max_y"] for b in panel_clean_bounds.values())
     else:
-        all_min_x, all_max_x, all_min_y, all_max_y = -900, 900, -700, 700
+        all_min_x, all_max_x, all_min_y, all_max_y = map_min_x, map_max_x, map_min_y, map_max_y
 
     ax2.set_xlim(all_min_x - 50, all_max_x + 50)
     ax2.set_ylim(all_min_y - 50, all_max_y + 50)
