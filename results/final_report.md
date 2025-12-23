@@ -13,8 +13,8 @@ Regions are detected based on the **Cleaned Defect Counts** (after noise removal
 ## Detected Regions (High Defect Density)
 | Region ID | Total Defects (Cleaned) | Sub-grid Count | Avg Defects/Grid | Sub-grids |
 |---|---|---|---|---|
-| 13 | 42 | 1 | 42.00 | ['C5-c3'] |
 | 14 | 42 | 1 | 42.00 | ['H5-a3'] |
+| 13 | 42 | 1 | 42.00 | ['C5-c3'] |
 | 9 | 40 | 1 | 40.00 | ['E4-c2'] |
 | 12 | 40 | 1 | 40.00 | ['F5-a2'] |
 | 6 | 40 | 1 | 40.00 | ['H3-a1'] |

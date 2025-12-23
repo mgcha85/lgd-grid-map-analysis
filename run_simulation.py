@@ -359,6 +359,9 @@ def main():
         os.makedirs(export_dir, exist_ok=True)
         print(f"   Exporting to {export_dir}...")
         
+        # Get all unique products from the source data
+        all_products = df_clean_defects.select("product_id").unique().sort("product_id")
+        
         # Map sub_grid_id to cell object for bounds
         cell_map = {c.sub_grid_id: c for c in grid_cells}
         
@@ -394,21 +397,28 @@ def main():
                 if not points_in_cell.is_empty():
                     region_points.append(points_in_cell)
             
+            # Prepare counts
             if region_points:
                 df_region_points = pl.concat(region_points)
                 
                 # Group by product_id and count
-                df_product_counts = df_region_points.group_by("product_id").agg(
+                df_counts = df_region_points.group_by("product_id").agg(
                     pl.len().alias("y")
-                ).sort("product_id")
-                
-                # Save to parquet
-                filename = f"area{rid}.parquet"
-                filepath = os.path.join(export_dir, filename)
-                df_product_counts.write_parquet(filepath)
-                print(f"   Saved {filename} ({len(df_product_counts)} products)")
+                )
             else:
-                print(f"   Warning: No points found for Region {rid} (Cleaned Data)")
+                # No points, but we still need to export 0 counts
+                df_counts = pl.DataFrame({"product_id": [], "y": []}, schema={"product_id": pl.Utf8, "y": pl.UInt32})
+
+            # Join with all products to ensure complete list
+            df_final = all_products.join(df_counts, on="product_id", how="left").with_columns(
+                pl.col("y").fill_null(0)
+            ).sort("product_id")
+            
+            # Save to parquet
+            filename = f"area{rid}.parquet"
+            filepath = os.path.join(export_dir, filename)
+            df_final.write_parquet(filepath)
+            print(f"   Saved {filename} ({len(df_final)} products)")
     else:
         print("   No regions with >= 2 sub-grids found.")
 if __name__ == "__main__":
