@@ -1,4 +1,6 @@
 scipy
+sqlalchemy
+python-dotenv
 polars>=1.0.0
 numpy
 matplotlib

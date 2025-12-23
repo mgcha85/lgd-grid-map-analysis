@@ -17,14 +17,69 @@ from analysis_utils import (
     create_subgrid_matrix,
     analyze_regions
 )
+# DB & Email Integration
+from database import SessionLocal, Panel, AnalysisConfig, Recipient
+from email_service import send_analysis_complete_email
 
 def main():
+    db = SessionLocal()
+    
     print("1. Loading Data...")
-    df_panels = pl.read_parquet("data/panels.parquet")
+    # Load Panels from DB
+    print("   Fetching Panels from Database...")
+    panels_query = db.query(Panel).all()
+    if not panels_query:
+        print("   Error: No panels found in DB. Please run init_db.py first.")
+        return
+        
+    # Convert DB panels to Polars DataFrame
+    panel_rows = [{
+        "panel_id": p.panel_id,
+        "sequence_no": p.sequence_no,
+        "x": p.x, # Center X
+        "y": p.y, # Center Y
+        "width": p.width,
+        "height": p.height
+    } for p in panels_query]
+    
+    # We need corners for gap analysis logic which expects 'x', 'y' as corners?
+    # Wait, generate_mock_data generated 4 corners per panel.
+    # The DB stores center x,y and width/height.
+    # We need to reconstruct the corners for compatibility with existing logic (filter_valid_points, find_gaps).
+    
+    reconstructed_rows = []
+    for p in panel_rows:
+        cx, cy = p["x"], p["y"]
+        w, h = p["width"], p["height"]
+        min_x = cx - w/2
+        max_x = cx + w/2
+        min_y = cy - h/2
+        max_y = cy + h/2
+        
+        # 4 Corners
+        corners = [
+            (min_x, min_y), (max_x, min_y), (max_x, max_y), (min_x, max_y)
+        ]
+        for x, y in corners:
+            reconstructed_rows.append({
+                "panel_id": p["panel_id"],
+                "sequence_no": p["sequence_no"],
+                "x": x,
+                "y": y
+            })
+            
+    df_panels = pl.DataFrame(reconstructed_rows)
+    
+    # Load Defects from Parquet (Batch Data)
     df_defects = pl.read_parquet("data/defects.parquet")
     
-    print(f"   Panels: {len(df_panels)}")
+    print(f"   Panels: {len(panels_query)} (Expanded to {len(df_panels)} corner points)")
     print(f"   Defects: {len(df_defects)}")
+    
+    # Load Config from DB
+    config_split_x = int(db.query(AnalysisConfig).filter(AnalysisConfig.key == "grid_split_x").first().value)
+    config_split_y = int(db.query(AnalysisConfig).filter(AnalysisConfig.key == "grid_split_y").first().value)
+    print(f"   Config: Grid Split {config_split_x}x{config_split_y}")
     
     # 2. Filter Outliers
     print("2. Filtering Outliers...")
@@ -43,9 +98,9 @@ def main():
     
     df_clean_defects = remove_gaps(df_valid_defects, shift_x, shift_y)
     
-    # 4. Generate Grid Cells (3x3 Split)
+    # 4. Generate Grid Cells (Using DB Config)
     print("4. Generating Grid Cells...")
-    grid_cells = generate_grid_cells(3, 3, shift_x, shift_y, df_panels)
+    grid_cells = generate_grid_cells(config_split_x, config_split_y, shift_x, shift_y, df_panels)
     print(f"   Generated {len(grid_cells)} grid cells.")
     
     # 5. Sub-grid Analysis (Cleaned Data)
@@ -55,29 +110,9 @@ def main():
     df_subgrid_counts_raw = count_defects_per_subgrid(df_valid_defects, grid_cells)
     
     # Calculate Cleaned Counts (Remove Noise)
-    # Noise params: mean=0.5 per 10x10 bin (area 100).
-    # Sub-grid area: width * height.
-    # We need to estimate noise per sub-grid.
-    # Assuming uniform noise density from `generate_background_noise` logic (mean=0.5 per 100 units area)
     noise_density = 0.5 / 100.0
     
-    cleaned_data = []
-    for row in df_subgrid_counts_raw.iter_rows(named=True):
-        # Find cell dimensions
-        # We can look up in grid_cells list or just use area if uniform.
-        # But cells might vary slightly? No, they are uniform splits.
-        # Let's find the cell object for width/height.
-        # Optimization: Create a map.
-        pass
-        
-    # Better: Add width/height to df_subgrid_counts_raw?
-    # Or just iterate grid_cells again since they align with df rows if sorted?
-    # `count_defects_per_subgrid` returns rows in order of grid_cells iteration.
-    
-    # Let's rebuild the DF with cleaned counts.
     cleaned_rows = []
-    
-    # Create map for cell dimensions
     cell_dim_map = {c.sub_grid_id: (c.width, c.height) for c in grid_cells}
     
     for row in df_subgrid_counts_raw.iter_rows(named=True):
@@ -88,10 +123,9 @@ def main():
         expected_noise = area * noise_density
         clean_count = max(0, raw_count - expected_noise)
         
-        # We use 'clean_count' as the 'count' for analysis
         cleaned_rows.append({
             "sub_grid_id": sid,
-            "count": int(round(clean_count)), # Round to nearest int for matrix
+            "count": int(round(clean_count)),
             "raw_count": raw_count,
             "global_row": row["global_row"],
             "global_col": row["global_col"]
@@ -103,7 +137,6 @@ def main():
     matrix = create_subgrid_matrix(df_subgrid_counts_clean)
     
     # Analyze Regions (CV) on Cleaned Data
-    # Threshold: e.g., > 0 defects after cleaning (or higher)
     df_regions, stats_df, labeled_matrix = analyze_regions(matrix, df_subgrid_counts_clean, threshold=0)
     print(f"   Found {len(stats_df)} high-defect regions (on cleaned data).")
     print(stats_df)
@@ -112,19 +145,16 @@ def main():
     print("6. Visualizing Results...")
     fig, axes = plt.subplots(1, 2, figsize=(24, 10))
     
-    # --- Plot 1: Original Map with Sub-grid Heatmap (Raw) & Regions (Cleaned) ---
+    # --- Plot 1: Original Map ---
     ax1 = axes[0]
     ax1.set_title(f"Original Map: Sub-grid Heatmap (Raw) & Regions (Detected on Cleaned)")
     
-    # Draw Defects (faint)
     ax1.scatter(df_defects["x"], df_defects["y"], s=1, c='gray', alpha=0.2, label="Defects")
     
-    # Draw Sub-grids colored by RAW count
     max_count_raw = df_subgrid_counts_clean["raw_count"].max()
     norm_raw = mcolors.Normalize(vmin=0, vmax=max_count_raw)
     cmap = cm.Reds
     
-    # Maps
     raw_count_map = {row["sub_grid_id"]: row["raw_count"] for row in df_subgrid_counts_clean.iter_rows(named=True)}
     clean_count_map = {row["sub_grid_id"]: row["count"] for row in df_subgrid_counts_clean.iter_rows(named=True)}
     region_map = {row["sub_grid_id"]: row["region_id"] for row in df_regions.iter_rows(named=True)}
@@ -133,22 +163,18 @@ def main():
         cnt = raw_count_map.get(cell.sub_grid_id, 0)
         color = cmap(norm_raw(cnt))
         
-        # Draw filled rect for heatmap
         rect = plt.Rectangle((cell.origin_min_x, cell.origin_min_y), cell.width, cell.height,
                              linewidth=0, facecolor=color, alpha=0.7)
         ax1.add_patch(rect)
         
-        # Draw border (dashed)
         rect_border = plt.Rectangle((cell.origin_min_x, cell.origin_min_y), cell.width, cell.height,
                              linewidth=0.5, edgecolor='black', linestyle=':', facecolor='none', alpha=0.3)
         ax1.add_patch(rect_border)
         
-        # Label sub-grid
         short_sub_id = cell.sub_grid_id.split("-")[-1]
         ax1.text(cell.origin_center_x, cell.origin_center_y, short_sub_id, 
                  ha='center', va='center', fontsize=4, color='black', alpha=0.3)
         
-        # Highlight Region (Detected on Cleaned Data)
         rid = region_map.get(cell.sub_grid_id, 0)
         if rid > 0:
             rect_reg = plt.Rectangle((cell.origin_min_x, cell.origin_min_y), cell.width, cell.height,
@@ -179,39 +205,33 @@ def main():
     ax1.set_ylim(-700, 700)
     plt.colorbar(cm.ScalarMappable(norm=norm_raw, cmap=cmap), ax=ax1, label="Raw Defect Count")
 
-    # --- Plot 2: Cleaned Map (Sub-grid based, Noise Removed) ---
+    # --- Plot 2: Cleaned Map ---
     ax2 = axes[1]
     ax2.set_title("Cleaned Map: Sub-grid Heatmap (Cleaned) & Regions")
     
     max_clean_count = df_subgrid_counts_clean["count"].max()
     norm_clean = mcolors.Normalize(vmin=0, vmax=max_clean_count)
     
-    # Draw Sub-grids on Cleaned Map
     for cell in grid_cells:
         clean_cnt = clean_count_map.get(cell.sub_grid_id, 0)
         color = cmap(norm_clean(clean_cnt))
         
-        # Calculate corner from center (clean coords)
         min_x = cell.clean_x - cell.width / 2
         min_y = cell.clean_y - cell.height / 2
         
-        # Fill
         rect = plt.Rectangle((min_x, min_y), cell.width, cell.height,
                              linewidth=0, facecolor=color, alpha=0.7)
         ax2.add_patch(rect)
         
-        # Border (dashed)
         rect_border = plt.Rectangle((min_x, min_y), cell.width, cell.height,
                              linewidth=0.5, edgecolor='black', linestyle=':', facecolor='none', alpha=0.3)
         ax2.add_patch(rect_border)
         
-        # Label
         short_sub_id = cell.sub_grid_id.split("-")[-1]
         ax2.text(cell.clean_x, cell.clean_y, short_sub_id, 
                  ha='center', va='center', fontsize=4, color='black', alpha=0.3)
 
     # Draw Region Boxes on Cleaned Map
-    # Aggregate clean bounds for regions
     region_bounds = {}
     for cell in grid_cells:
         rid = region_map.get(cell.sub_grid_id, 0)
@@ -280,12 +300,14 @@ def main():
     plt.colorbar(cm.ScalarMappable(norm=norm_clean, cmap=cmap), ax=ax2, label="Cleaned Defect Count")
 
     plt.tight_layout()
-    plt.savefig("results/final_result.png")
-    print("Saved results/final_result.png")
+    result_path = "results/final_result.png"
+    plt.savefig(result_path)
+    print(f"Saved {result_path}")
     
     # 7. Generate Report
     print("7. Generating Report...")
-    with open("results/final_report.md", "w") as f:
+    report_path = "results/final_report.md"
+    with open(report_path, "w") as f:
         f.write("# Grid Map Analysis Final Report\n\n")
         f.write("## Overview\n")
         f.write("This report summarizes the analysis of defect patterns on the panel grid. ")
@@ -311,7 +333,17 @@ def main():
         else:
             f.write("| None | - | - | - | - |\n")
             
-    print("Saved results/final_report.md")
+    print(f"Saved {report_path}")
+    
+    # 8. Send Email
+    print("8. Sending Email Notification...")
+    recipients = [r.email for r in db.query(Recipient).all()]
+    if recipients:
+        send_analysis_complete_email(recipients, report_path, result_path)
+    else:
+        print("   No recipients found in DB.")
+        
+    db.close()
 
 if __name__ == "__main__":
     main()
