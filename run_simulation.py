@@ -7,12 +7,6 @@ import os
 from gap_analysis import find_gaps, remove_gaps, filter_valid_points
 from grid_mapping import generate_grid_cells, get_panel_label
 from analysis_utils import (
-    generate_heatmap, 
-    generate_background_noise, 
-    remove_noise, 
-    find_connected_components, 
-    map_points_to_components,
-    calculate_original_bounds,
     count_defects_per_subgrid,
     create_subgrid_matrix,
     analyze_regions
@@ -20,6 +14,7 @@ from analysis_utils import (
 # DB & Email Integration
 from database import SessionLocal, Panel, AnalysisConfig, Recipient
 from email_service import send_analysis_complete_email
+
 
 def main():
     db = SessionLocal()
@@ -431,5 +426,7 @@ def main():
             print(f"   Saved {filename} ({len(df_final)} products)")
     else:
         print("   No regions with >= 2 sub-grids found.")
+
+
 if __name__ == "__main__":
     main()
