@@ -12,7 +12,7 @@ def find_gaps(panel_df: pl.DataFrame):
         Each is a DataFrame mapping ranges to a shift amount.
     """
     # 1. Determine bounding box for each panel
-    bounds = panel_df.group_by("PanelID").agg([
+    bounds = panel_df.group_by("panel_id").agg([
         pl.col("x").min().alias("min_x"),
         pl.col("x").max().alias("max_x"),
         pl.col("y").min().alias("min_y"),
@@ -112,7 +112,7 @@ def filter_valid_points(data_df: pl.DataFrame, panel_df: pl.DataFrame):
     
     # 1. Get Bounds per panel
     # We can get unique X intervals and unique Y intervals from all panels
-    bounds = panel_df.group_by("PanelID").agg([
+    bounds = panel_df.group_by("panel_id").agg([
         pl.col("x").min().alias("min_x"),
         pl.col("x").max().alias("max_x"),
         pl.col("y").min().alias("min_y"),
