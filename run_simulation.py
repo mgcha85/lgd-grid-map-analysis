@@ -345,5 +345,71 @@ def main():
         
     db.close()
 
+    # 9. Region-based Product Analysis (Export)
+    print("9. Exporting Region-based Product Analysis...")
+    from datetime import datetime
+    
+    # Filter regions with >= 2 sub-grids
+    target_regions = stats_df.filter(pl.col("sub_grid_count") >= 2)
+    
+    if not target_regions.is_empty():
+        # Create timestamped directory
+        timestamp = datetime.now().strftime("%Y%m%d%H%M")
+        export_dir = os.path.join("results", timestamp)
+        os.makedirs(export_dir, exist_ok=True)
+        print(f"   Exporting to {export_dir}...")
+        
+        # Map sub_grid_id to cell object for bounds
+        cell_map = {c.sub_grid_id: c for c in grid_cells}
+        
+        for row in target_regions.iter_rows(named=True):
+            rid = row["region_id"]
+            sub_grids = row["sub_grids"] # List of sub_grid_ids
+            
+            # Collect all points belonging to this region
+            # We filter df_clean_defects based on sub-grid bounds
+            
+            region_points = []
+            
+            for sid in sub_grids:
+                cell = cell_map.get(sid)
+                if not cell:
+                    continue
+                    
+                # Clean bounds
+                min_x = cell.clean_x - cell.width / 2
+                max_x = cell.clean_x + cell.width / 2
+                min_y = cell.clean_y - cell.height / 2
+                max_y = cell.clean_y + cell.height / 2
+                
+                # Filter points in this sub-grid
+                # Note: df_clean_defects has 'x', 'y' as cleaned coordinates
+                # and 'product_id' from original data
+                
+                points_in_cell = df_clean_defects.filter(
+                    (pl.col("x") >= min_x) & (pl.col("x") < max_x) &
+                    (pl.col("y") >= min_y) & (pl.col("y") < max_y)
+                )
+                
+                if not points_in_cell.is_empty():
+                    region_points.append(points_in_cell)
+            
+            if region_points:
+                df_region_points = pl.concat(region_points)
+                
+                # Group by product_id and count
+                df_product_counts = df_region_points.group_by("product_id").agg(
+                    pl.len().alias("y")
+                ).sort("product_id")
+                
+                # Save to parquet
+                filename = f"area{rid}.parquet"
+                filepath = os.path.join(export_dir, filename)
+                df_product_counts.write_parquet(filepath)
+                print(f"   Saved {filename} ({len(df_product_counts)} products)")
+            else:
+                print(f"   Warning: No points found for Region {rid} (Cleaned Data)")
+    else:
+        print("   No regions with >= 2 sub-grids found.")
 if __name__ == "__main__":
     main()

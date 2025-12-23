@@ -109,7 +109,8 @@ def generate_data(base_dir=".", n_defects=1000, n_outliers=50):
             defects.append({
                 "x": x,
                 "y": y,
-                "defect_type": "ClusterDefect"
+                "defect_type": "ClusterDefect",
+                "product_id": rng.choice(["PROD_A", "PROD_B", "PROD_C"])
             })
             
     # Add some random noise defects (uniform)
@@ -125,7 +126,8 @@ def generate_data(base_dir=".", n_defects=1000, n_outliers=50):
         defects.append({
             "x": x,
             "y": y,
-            "defect_type": "RandomNoise"
+            "defect_type": "RandomNoise",
+            "product_id": rng.choice(["PROD_A", "PROD_B", "PROD_C"])
         })
 
     # 3. Generate Outliers (Outside panels, in gaps or outer bounds)
@@ -137,7 +139,8 @@ def generate_data(base_dir=".", n_defects=1000, n_outliers=50):
         defects.append({
             "x": x,
             "y": y,
-            "defect_type": "Outlier"
+            "defect_type": "Outlier",
+            "product_id": rng.choice(["PROD_A", "PROD_B", "PROD_C"])
         })
 
     df_defects = pl.DataFrame(defects)
