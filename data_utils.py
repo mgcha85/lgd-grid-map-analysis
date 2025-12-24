@@ -1,5 +1,15 @@
 import polars as pl
 
+
+def extract_seq_no(df: pl.DataFrame) -> pl.DataFrame:
+    # 마지막 글자 추출 후 int로 변환
+    return df.with_columns(
+        pl.col("panel_id")
+        .str.slice(-1)          # 뒤에서 1번째 글자부터 끝까지 슬라이스
+        .cast(pl.Int8)         # 정수형으로 형변환
+        .alias("sequence_no")        # 새로운 컬럼명 지정
+    )
+
 def extract_panel_addr(
     df: pl.DataFrame, 
     panel_id_col: str, 

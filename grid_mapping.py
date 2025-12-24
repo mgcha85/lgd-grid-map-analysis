@@ -69,7 +69,11 @@ def generate_grid_cells(
     rows = panel_bounds.iter_rows(named=True)
     for row in rows:
         p_id = row["panel_id"]
-        seq = row["seq"]
+        try:
+            seq = int(p_id[-1])
+        except:
+            raise ValueError(f"Invalid panel ID: {p_id}")
+
         min_x = row["p_min_x"]
         max_x = row["p_max_x"]
         min_y = row["p_min_y"]
